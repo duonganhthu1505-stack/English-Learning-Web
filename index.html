@@ -13,21 +13,36 @@
 <header class="topbar"><div class="brand"><div class="logo">Aa</div><div><h1>Daily English</h1><p>Little steps, real progress.</p></div></div><div class="top-actions"><button class="pill" id="voiceToggle" title="Chọn giọng đọc">🔊 <span id="voiceLabel">US voice</span></button><button class="pill" id="resetBtn">↻ Reset</button></div></header>
 <section class="hero"><div><div class="eyebrow">Your personal learning space</div><h2>Learn a little.<br>Grow every day.</h2><p>Học tiếng Anh từng ngày với tình huống công việc thực tế, phát âm ngay trên trang và bài tập ngắn dễ duy trì.</p><button class="primary" id="continueBtn">Tiếp tục học hôm nay ↗</button></div><div class="hero-art"><div class="book"><small>YOUR DAILY PRACTICE</small><strong>English<br>in action.</strong><span>Vocabulary · Speaking · Work</span></div></div></section>
 <section class="stats"><div class="stat"><div class="label">Bài đã hoàn thành</div><div class="num" id="doneCount">0 / 8</div><div class="hint">Tiến từng bước nhỏ</div></div><div class="stat"><div class="label">Điểm bài tập</div><div class="num" id="scoreCount">—</div><div class="hint">Điểm cao nhất</div></div><div class="stat"><div class="label">Chuỗi ngày học</div><div class="num" id="streakCount">0 🔥</div><div class="hint">Quay lại mỗi ngày</div></div></section>
-<div class="layout"><main><div class="section-head"><div><h3>Lộ trình của bạn</h3><p>8 bài đầu · English for everyday work</p></div><span class="eyebrow">WEEK 01</span></div><div class="days" id="lessonList"></div></main>
+<div class="layout"><main><div class="section-head"><div><h3>Lộ trình của bạn</h3><p id="lessonCount">Loading...</p></div><span class="eyebrow">WEEK 01</span></div><div class="days" id="lessonList"></div></main>
 <aside><section class="panel"><h3>Weekly progress</h3><div style="display:flex;justify-content:space-between;align-items:center"><strong id="progressText">0% completed</strong><span>✦</span></div><div class="progress-line"><div class="progress-fill" id="progressFill"></div></div><p class="side-note">Mỗi bài chỉ cần khoảng 10–15 phút. Hoàn thành bài tập để đánh dấu bài học.</p></section>
 <section class="panel"><h3>Word of the day</h3><div id="wordToday"></div></section>
 <section class="panel"><h3>Quick practice</h3><p class="side-note">Luyện một câu tiếng Anh dùng trong công việc.</p><div class="block"><div class="vocab"><div><strong>Could you review this?</strong><p>Bạn có thể xem lại cái này không?</p></div><button class="sound" data-speak="Could you review this?" aria-label="Nghe câu">▶</button></div></div><button class="secondary" style="width:100%" id="quickQuiz">Làm câu hỏi nhanh</button></section>
-<section class="panel"><h3>Learning tip</h3><p class="side-note">Nghe một câu, đọc theo thành tiếng 3 lần, rồi tự đặt một câu tương tự về công việc của bạn.</p></section></aside></div><footer>Made for your learning journey · Your progress is saved in this browser.</footer></div>
+<section class="panel"><h3>Learning tip</h3><p class="side-note">Nghe một câu, đọc theo thành tiếng 3 lần, rồi tự đặt một câu tương tự về công việc của bạn.</p></section></aside></div><footer>Made for your learning journey · Your progress is saved in this browser. · Now with 700 lessons!</footer></div>
 <div class="modal-backdrop" id="modalBackdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><div class="eyebrow" id="modalEyebrow">DAY 1</div><h2 id="modalTitle">Lesson title</h2></div><button class="close" id="closeModal" aria-label="Đóng">✕</button></div><p class="modal-sub" id="modalSub"></p><div id="modalContent"></div><div class="modal-actions"><button class="secondary" id="prevQuestion">← Câu trước</button><button class="primary" id="nextQuestion">Câu tiếp theo →</button></div><div class="toast" id="modalToast">Tiến độ được lưu trên trình duyệt này.</div></section></div>
 <script>
 let lessons = [];
+const key="dailyEnglishProgressV1";
+let state=loadState(),current=0,qIndex=0,answers={},checked=false,voice="US";
+
+// Load state from localStorage
+function loadState(){try{return JSON.parse(localStorage.getItem(key))||{done:[],scores:{},lastDate:"",streak:0,knownWords:[]}}catch{return{done:[],scores:{},lastDate:"",streak:0,knownWords:[]}}}
+if(!Array.isArray(state.knownWords))state.knownWords=[];
+
+// Load lessons from JSON file
 async function loadLessons() {
   try {
     const response = await fetch('lessons.json');
     if (!response.ok) throw new Error('Failed to load lessons');
     lessons = await response.json();
     console.log('Loaded', lessons.length, 'lessons');
-    // Update UI after loading
+    
+    // Update lesson count display
+    document.getElementById('lessonCount').textContent = lessons.length + ' bài · English for everyday work';
+    
+    // Setup all event listeners after lessons are loaded
+    setupEventListeners();
+    
+    // Render initial UI
     renderLessons();
     renderStats();
     renderWord();
@@ -40,6 +55,7 @@ async function loadLessons() {
       {title:"What are you doing now?",desc:"Nói về việc đang diễn ra ngay lúc này.",grammar:"Present continuous",words:[["review documents","xem xét tài liệu","I am reviewing the documents now."],["prepare a report","chuẩn bị một báo cáo","I am preparing a report."],["wait for approval","chờ phê duyệt","I am waiting for approval."]],qs:[{q:"I ___ an invoice right now.",opts:["check","checks","am checking"],a:2,why:"Right now chỉ hành động đang diễn ra: am/is/are + V-ing."},{q:"Chọn câu đúng.",opts:["We are reviewing the documents now.","We reviewing the documents now.","We is reviewing the documents now."],a:0,why:"We đi với are; cấu trúc are + reviewing."}]},
       {title:"Useful workplace requests",desc:"Yêu cầu lịch sự khi trao đổi với đồng nghiệp.",grammar:"Polite requests",words:[["Could you…?","Bạn có thể… không?","Could you review this document?"],["Please approve","Vui lòng phê duyệt","Could you please approve this request?"],["when you have time","khi bạn có thời gian","Please check it when you have time."]],qs:[{q:"Cách nói lịch sự nhất là gì?",opts:["Approve this now.","Could you please review this?","You review this."],a:1,why:"Could you please…? là cấu trúc yêu cầu lịch sự."},{q:"Dịch: Bạn có thể kiểm tra tài liệu này không?",opts:["Could you check this document?","You can checking this document?","Could you checked this document?"],a:0,why:"Could + chủ ngữ + động từ nguyên mẫu."}]}
     ];
+    setupEventListeners();
     renderLessons();
     renderStats();
     renderWord();
@@ -47,11 +63,16 @@ async function loadLessons() {
   }
 }
 
-// Load lessons when the page loads
-document.addEventListener('DOMContentLoaded', loadLessons);
-const key="dailyEnglishProgressV1";let state=loadState(),current=0,qIndex=0,answers={},checked=false,voice="US";
-function loadState(){try{return JSON.parse(localStorage.getItem(key))||{done:[],scores:{},lastDate:"",streak:0,knownWords:[]}}catch{return{done:[],scores:{},lastDate:"",streak:0,knownWords:[]}}}
-if(!Array.isArray(state.knownWords))state.knownWords=[];
+// Setup all event listeners
+function setupEventListeners() {
+  document.getElementById("closeModal").onclick=closeLesson;
+  document.getElementById("modalBackdrop").onclick=e=>{if(e.target.id==="modalBackdrop")closeLesson()};
+  document.getElementById("continueBtn").onclick=()=>openLesson(lessons.findIndex((_,i)=>!state.done.includes(i))<0?0:lessons.findIndex((_,i)=>!state.done.includes(i)));
+  document.getElementById("quickQuiz").onclick=()=>openLesson((new Date().getDate()-1)%lessons.length);
+  document.getElementById("voiceToggle").onclick=()=>{voice=voice==="US"?"UK":"US";document.getElementById("voiceLabel").textContent=voice+" voice";speak(voice==="US"?"Hello! Let's practice English.":"Hello! Let's practise English.")};
+  document.getElementById("resetBtn").onclick=()=>{if(confirm("Xóa toàn bộ tiến độ học đã lưu trên trình duyệt này?")){state={done:[],scores:{},lastDate:"",streak:0,knownWords:[]};save();renderLessons()}};
+}
+
 function markKnown(word){if(!state.knownWords.includes(word))state.knownWords.push(word);save();renderQuestion()}
 function save(){localStorage.setItem(key,JSON.stringify(state));renderStats()}
 function renderStats(){let n=state.done.length;document.getElementById("doneCount").textContent=n+" / "+lessons.length;document.getElementById("progressText").textContent=Math.round(n/lessons.length*100)+"% completed";document.getElementById("progressFill").style.width=n/lessons.length*100+"%";let sc=Object.values(state.scores);document.getElementById("scoreCount").textContent=sc.length?Math.max(...sc)+"%":"—";document.getElementById("streakCount").textContent=(state.streak||0)+" 🔥"}
@@ -61,8 +82,10 @@ function renderWord(){let day=(new Date().getDate()-1)%lessons.length;let w=less
 function wireSpeak(){document.querySelectorAll("[data-speak]").forEach(b=>b.onclick=()=>speak(b.dataset.speak))}
 function openLesson(i){current=i;qIndex=0;answers={};checked=false;document.getElementById("modalBackdrop").classList.add("open");renderQuestion()}
 function renderQuestion(){const l=lessons[current],q=l.qs[qIndex];document.getElementById("modalEyebrow").textContent="DAY "+String(current+1).padStart(2,"0")+" · "+l.grammar;document.getElementById("modalTitle").textContent=l.title;document.getElementById("modalSub").textContent=l.desc;let visibleWords=l.words.filter(w=>!state.knownWords.includes(w[0]));
-let words='<div class="block"><h4>📚 Vocabulary · Từ vựng</h4><p class="side-note">Bấm “Đã biết” để lưu từ này. Từ đã biết sẽ được ẩn khỏi phần từ vựng ở các bài sau trên trình duyệt này.</p>'+(visibleWords.length?visibleWords.map(w=>'<div class="word-row"><div><strong>'+w[0]+'</strong><small>'+w[1]+'</small><p class="side-note">'+w[2]+'</p></div><div style="display:flex;gap:6px;align-items:center"><button class="sound" data-speak="'+w[2].replace(/"/g,"&quot;")+'" aria-label="Nghe câu">▶</button><button class="small-btn" data-known="'+w[0].replace(/"/g,"&quot;")+'">Đã biết ✓</button></div></div>').join(""):'<p class="side-note">Bạn đã đánh dấu biết hết từ vựng trong bài này rồi 🎉</p>')+'</div>';let opts=q.opts.map((o,j)=>'<button class="option '+(answers[qIndex]===j?'selected':'')+'" data-opt="'+j+'">'+String.fromCharCode(65+j)+'. '+o+'</button>').join("");document.getElementById("modalContent").innerHTML=words+'<div class="block"><div class="eyebrow">PRACTICE '+(qIndex+1)+' / '+l.qs.length+'</div><div class="exercise-question">'+q.q+'</div><div class="options">'+opts+'</div><div class="feedback '+(checked?(answers[qIndex]===q.a?'good':'bad'):'')+'" id="feedback">'+(checked?(answers[qIndex]===q.a?'✓ Chính xác! ':'✗ Chưa đúng. Đáp án: '+q.opts[q.a]+'. ')+q.why:'Chọn một đáp án rồi bấm Kiểm tra.')+'</div></div>';document.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>{if(!checked){answers[qIndex]=+b.dataset.opt;renderQuestion()}});document.querySelectorAll("[data-known]").forEach(b=>b.onclick=()=>markKnown(b.dataset.known));wireSpeak();document.getElementById("prevQuestion").textContent=qIndex===0?"← Đóng bài":"← Câu trước";document.getElementById("nextQuestion").textContent=checked?(qIndex===l.qs.length-1?"Hoàn thành bài ✓":"Câu tiếp theo →"):"Kiểm tra đáp án";document.getElementById("nextQuestion").onclick=nextAction;document.getElementById("prevQuestion").onclick=()=>{if(qIndex===0)closeLesson();else{qIndex--;checked=false;renderQuestion()}}}
+let words='<div class="block"><h4>📚 Vocabulary · Từ vựng</h4><p class="side-note">Bấm "Đã biết" để lưu từ này. Từ đã biết sẽ được ẩn khỏi phần từ vựng ở các bài sau trên trình duyệt này.</p>'+(visibleWords.length?visibleWords.map(w=>'<div class="word-row"><div><strong>'+w[0]+'</strong><small>'+w[1]+'</small><p class="side-note">'+w[2]+'</p></div><div style="display:flex;gap:6px;align-items:center"><button class="sound" data-speak="'+w[2].replace(/\"/g,"&quot;")+'" aria-label="Nghe câu">▶</button><button class="small-btn" data-known="'+w[0].replace(/\"/g,"&quot;")+'">Đã biết ✓</button></div></div>').join(""):'<p class="side-note">Bạn đã đánh dấu biết hết từ vựng trong bài này rồi 🎉</p>')+'</div>';let opts=q.opts.map((o,j)=>'<button class="option '+(answers[qIndex]===j?'selected':'')+'" data-opt="'+j+'">'+String.fromCharCode(65+j)+'. '+o+'</button>').join("");document.getElementById("modalContent").innerHTML=words+'<div class="block"><div class="eyebrow">PRACTICE '+(qIndex+1)+' / '+l.qs.length+'</div><div class="exercise-question">'+q.q+'</div><div class="options">'+opts+'</div><div class="feedback '+(checked?(answers[qIndex]===q.a?'good':'bad'):'')+'" id="feedback">'+(checked?(answers[qIndex]===q.a?'✓ Chính xác! ':'✗ Chưa đúng. Đáp án: '+q.opts[q.a]+'. ')+q.why:'Chọn một đáp án rồi bấm Kiểm tra.')+'</div></div>';document.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>{if(!checked){answers[qIndex]=+b.dataset.opt;renderQuestion()}});document.querySelectorAll("[data-known]").forEach(b=>b.onclick=()=>markKnown(b.dataset.known));wireSpeak();document.getElementById("prevQuestion").textContent=qIndex===0?"← Đóng bài":"← Câu trước";document.getElementById("nextQuestion").textContent=checked?(qIndex===l.qs.length-1?"Hoàn thành bài ✓":"Câu tiếp theo →"):"Kiểm tra đáp án";document.getElementById("nextQuestion").onclick=nextAction;document.getElementById("prevQuestion").onclick=()=>{if(qIndex===0)closeLesson();else{qIndex--;checked=false;renderQuestion()}}}
 function nextAction(){const q=lessons[current].qs[qIndex];if(!checked){if(answers[qIndex]===undefined){document.getElementById("feedback").textContent="Chọn một đáp án trước nhé.";return}checked=true;renderQuestion();return}if(qIndex<lessons[current].qs.length-1){qIndex++;checked=false;renderQuestion();return}let qs=lessons[current].qs,correct=qs.reduce((n,q,i)=>n+(answers[i]===q.a?1:0),0),score=Math.round(correct/qs.length*100);state.scores[current]=Math.max(state.scores[current]||0,score);if(!state.done.includes(current))state.done.push(current);let today=new Date().toISOString().slice(0,10);if(state.lastDate!==today){let y=new Date(Date.now()-86400000).toISOString().slice(0,10);state.streak=state.lastDate===y?(state.streak||0)+1:1;state.lastDate=today}save();renderLessons();document.getElementById("modalContent").innerHTML='<div class="block" style="text-align:center;padding:30px"><div style="font-size:42px">'+(score===100?'🎉':'🌱')+'</div><h3 style="font:28px Georgia,serif">Bài học hoàn thành!</h3><p>Bạn trả lời đúng '+correct+'/'+qs.length+' câu.</p><div style="font:42px Georgia,serif;color:var(--brown)">'+score+'%</div><p class="side-note">Hãy đọc lại câu mẫu và thử nói thành tiếng nhé.</p></div>';document.getElementById("prevQuestion").style.display="none";document.getElementById("nextQuestion").textContent="Đóng bài";document.getElementById("nextQuestion").onclick=closeLesson;document.getElementById("modalToast").textContent="Đã lưu tiến độ trên trình duyệt này."}
 function closeLesson(){document.getElementById("modalBackdrop").classList.remove("open");document.getElementById("prevQuestion").style.display="";renderStats()}
-document.getElementById("closeModal").onclick=closeLesson;document.getElementById("modalBackdrop").onclick=e=>{if(e.target.id==="modalBackdrop")closeLesson()};document.getElementById("continueBtn").onclick=()=>openLesson(lessons.findIndex((_,i)=>!state.done.includes(i))<0?0:lessons.findIndex((_,i)=>!state.done.includes(i)));document.getElementById("quickQuiz").onclick=()=>openLesson((new Date().getDate()-1)%lessons.length);document.getElementById("voiceToggle").onclick=()=>{voice=voice==="US"?"UK":"US";document.getElementById("voiceLabel").textContent=voice+" voice";speak(voice==="US"?"Hello! Let's practice English.":"Hello! Let's practise English.")};document.getElementById("resetBtn").onclick=()=>{if(confirm("Xóa toàn bộ tiến độ học đã lưu trên trình duyệt này?")){state={done:[],scores:{},lastDate:"",streak:0,knownWords:[]};save();renderLessons()}};
+
+// Load lessons when the page loads
+document.addEventListener('DOMContentLoaded', loadLessons);
 </script></body></html>
