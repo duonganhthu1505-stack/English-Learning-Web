@@ -375,12 +375,61 @@ function inferLessonLevel(lesson) {
   return 1;
 }
 
+function normalizeOptionText(option) {
+  return String(option).toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Reject questions produced by the old broken templates (see
+// scripts/clean_lessons.py): duplicated options, distractors made by
+// appending " not"/" incorrect" to the correct sentence, options that
+// differ only by a/an/the (so more than one is correct), and the
+// "I want to ___ <last word of a phrase>" fill-in (e.g. vocab "excuse me"
+// -> "I want to ___ excuse me." with options me/mes/meing). Lessons are
+// topped up with vocabulary questions by ensureQuestionCount instead.
+function isBrokenQuestion(questionText, opts, answer) {
+  const normalized = opts.map(normalizeOptionText);
+  if (new Set(normalized).size !== normalized.length) return true;
+  const withoutArticles = normalized.map(option => option.replace(/\b(a|an|the)\b/g, "").replace(/\s+/g, " ").trim());
+  if (new Set(withoutArticles).size !== withoutArticles.length) return true;
+  for (const option of normalized) {
+    const stripped = option.replace(/\s+(not|incorrect)$/, "");
+    if (stripped !== option && normalized.includes(stripped)) return true;
+  }
+  const wantTo = /^I want to ___\s+(.+?)\.?$/.exec(questionText.trim());
+  if (wantTo) {
+    const lastWord = normalizeOptionText(wantTo[1]).split(" ").pop();
+    if (lastWord && normalizeOptionText(opts[answer]) === lastWord) return true;
+  }
+  return false;
+}
+
+// Stored questions almost always keep the correct answer in slot A, which
+// learners quickly learn to game. Deterministically shuffle the options
+// (seeded by the question text, so the order is stable between renders).
+function shuffleQuestionOptions(question) {
+  const seed = hashString(`${question.q}|${question.opts.join("|")}`);
+  const order = question.opts.map((_, index) => index);
+  let state = seed || 1;
+  for (let index = order.length - 1; index > 0; index--) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    const swapWith = state % (index + 1);
+    [order[index], order[swapWith]] = [order[swapWith], order[index]];
+  }
+  return {
+    ...question,
+    opts: order.map(index => question.opts[index]),
+    a: order.indexOf(question.a)
+  };
+}
+
 function normalizeQuestion(question) {
   if (!question || typeof question !== "object") return null;
   const opts = Array.isArray(question.opts) ? question.opts.map(option => String(option)) : [];
   const answer = Number(question.a);
   if (!question.q || opts.length < 2 || !Number.isInteger(answer) || answer < 0 || answer >= opts.length) return null;
-  return { q: String(question.q), opts, a: answer, why: String(question.why || "") };
+  const cleaned = { q: String(question.q), opts, a: answer, why: String(question.why || "") };
+  if (isBrokenQuestion(cleaned.q, cleaned.opts, cleaned.a)) return null;
+  return shuffleQuestionOptions(cleaned);
 }
 
 function normalizeLesson(source, id, isCustom = false) {
