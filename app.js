@@ -1217,6 +1217,53 @@ function analyzeContent() {
   }
   renderAnalysisPreview();
   document.getElementById("saveCustomLesson").disabled = false;
+  fillMissingGlosses(analysisDraft);
+}
+
+// Cache nghĩa đã tra trong phiên làm việc để không gọi API lặp lại.
+const freeTranslationCache = new Map();
+
+// Dịch từ tiếng Anh sang tiếng Việt bằng MyMemory (miễn phí, không cần API key).
+// Trả về "" nếu lỗi hoặc không có kết quả, để người dùng tự nhập.
+async function fetchFreeTranslation(term) {
+  const key = String(term || "").toLowerCase();
+  if (!key) return "";
+  if (freeTranslationCache.has(key)) return freeTranslationCache.get(key);
+  let result = "";
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(key)}&langpair=en|vi`;
+    const response = await fetch(url);
+    if (response.ok) {
+      const data = await response.json();
+      const text = String(data?.responseData?.translatedText || "").trim();
+      const isWarning = /MYMEMORY WARNING|QUOTA|INVALID/i.test(text);
+      if (text && !isWarning && text.toLowerCase() !== key) result = text;
+    }
+  } catch (error) {
+    result = "";
+  }
+  freeTranslationCache.set(key, result);
+  return result;
+}
+
+// Tự điền nghĩa cho các từ còn trống. Chỉ điền ô người dùng chưa nhập gì,
+// và bỏ qua nếu người dùng đã phân tích nội dung khác trong lúc chờ.
+async function fillMissingGlosses(draft) {
+  const missing = draft.vocabulary
+    .map((word, index) => ({ word, index }))
+    .filter(({ word }) => !word.gloss);
+  for (const { word, index } of missing) {
+    if (analysisDraft !== draft) return;
+    const input = document.querySelector(`[data-gloss-index="${index}"]`);
+    if (input) input.placeholder = "Đang tự tra nghĩa…";
+    const translation = await fetchFreeTranslation(word.term);
+    if (analysisDraft !== draft) return;
+    if (translation) {
+      word.gloss = translation;
+      if (input && !input.value.trim()) input.value = translation;
+    }
+    if (input) input.placeholder = "Nhập nghĩa tiếng Việt nếu chưa có";
+  }
 }
 
 function renderAnalysisPreview() {
