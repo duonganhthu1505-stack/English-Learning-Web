@@ -97,7 +97,68 @@ const BUILT_IN_GLOSSES = {
   "shape": "hình dạng",
   "large": "lớn",
   "small": "nhỏ",
-  "finished": "đã hoàn thiện"
+  "finished": "đã hoàn thiện",
+  "arrange": "sắp xếp, thu xếp",
+  "brochure": "tờ rơi quảng cáo, tập sách giới thiệu",
+  "carpet": "thảm trải sàn",
+  "cushion": "gối tựa, đệm ngồi",
+  "sofa": "ghế sofa",
+  "spread": "trải ra, lan rộng",
+  "table": "cái bàn",
+  "chair": "cái ghế",
+  "desk": "bàn làm việc",
+  "room": "căn phòng",
+  "window": "cửa sổ",
+  "door": "cửa ra vào",
+  "floor": "sàn nhà",
+  "wall": "bức tường",
+  "shelf": "kệ, giá sách",
+  "picture": "bức tranh, hình ảnh",
+  "lamp": "đèn bàn",
+  "curtain": "rèm cửa",
+  "furniture": "đồ nội thất",
+  "box": "cái hộp",
+  "package": "gói hàng, kiện hàng",
+  "product": "sản phẩm",
+  "price": "giá cả",
+  "order": "đơn hàng, đặt hàng",
+  "delivery": "sự giao hàng",
+  "warehouse": "nhà kho",
+  "inventory": "hàng tồn kho",
+  "manager": "quản lý",
+  "staff": "nhân viên, đội ngũ",
+  "team": "nhóm, đội",
+  "project": "dự án",
+  "deadline": "hạn chót",
+  "budget": "ngân sách",
+  "contract": "hợp đồng",
+  "agreement": "thỏa thuận",
+  "client": "khách hàng (doanh nghiệp)",
+  "salary": "tiền lương",
+  "interview": "buổi phỏng vấn",
+  "department": "phòng ban",
+  "company": "công ty",
+  "customer service": "dịch vụ khách hàng",
+  "receipt": "biên lai",
+  "address": "địa chỉ",
+  "city": "thành phố",
+  "street": "đường phố",
+  "station": "nhà ga, trạm",
+  "ticket": "vé",
+  "flight": "chuyến bay",
+  "luggage": "hành lý",
+  "garden": "khu vườn",
+  "kitchen": "nhà bếp",
+  "bedroom": "phòng ngủ",
+  "bathroom": "phòng tắm",
+  "bread": "bánh mì",
+  "coffee": "cà phê",
+  "tea": "trà",
+  "water": "nước",
+  "apple": "quả táo",
+  "book": "cuốn sách",
+  "paper": "giấy",
+  "pen": "bút"
 };
 
 const PHRASAL_VERBS = [
@@ -260,12 +321,35 @@ function normalizeEnglishToken(token) {
   return lower;
 }
 
+// Trả về dạng từ dùng làm thuật ngữ: ưu tiên dạng nguyên mẫu có nghĩa
+// (ví dụ "arranging" -> "arrange" thay vì "arrang").
+function hasDirectGloss(term) {
+  return Boolean(BUILT_IN_GLOSSES[term] || dictionaryGlosses.get(term));
+}
+
+function resolveVocabularyTerm(token) {
+  const key = String(token || "").toLowerCase();
+  const normalized = normalizeEnglishToken(key);
+  if (!hasDirectGloss(normalized) && hasDirectGloss(`${normalized}e`)) {
+    return `${normalized}e`;
+  }
+  return normalized;
+}
+
 function getTermGloss(term) {
   const key = String(term || "").toLowerCase();
-  if (BUILT_IN_GLOSSES[key]) return BUILT_IN_GLOSSES[key];
   const normalized = normalizeEnglishToken(key);
-  if (BUILT_IN_GLOSSES[normalized]) return BUILT_IN_GLOSSES[normalized];
-  return dictionaryGlosses.get(key) || dictionaryGlosses.get(normalized) || "";
+  // Thử cả dạng gốc, dạng đã chuẩn hóa, và dạng nguyên mẫu thêm "e"
+  // (ví dụ "arranging" -> "arrang" -> "arrange").
+  const candidates = [...new Set([key, normalized, `${normalized}e`])];
+  for (const candidate of candidates) {
+    if (BUILT_IN_GLOSSES[candidate]) return BUILT_IN_GLOSSES[candidate];
+  }
+  for (const candidate of candidates) {
+    const gloss = dictionaryGlosses.get(candidate);
+    if (gloss) return gloss;
+  }
+  return "";
 }
 
 function indexDictionary(raw) {
@@ -1010,7 +1094,7 @@ function findVocabulary(sentences) {
       if (coveredByPhrase.some(range => absoluteStart >= range.start && absoluteStart < range.end)) continue;
       const surface = match[0].toLowerCase().replace(/[’']/g, "");
       if (STOP_WORDS.has(surface) || surface.length < 3) continue;
-      const term = normalizeEnglishToken(surface);
+      const term = resolveVocabularyTerm(surface);
       if (STOP_WORDS.has(term) || term.length < 3) continue;
       if (/^\d+$/.test(term)) continue;
       const existing = found.get(term);
